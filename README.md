@@ -158,7 +158,7 @@ cd.show_global_informations()
 
 
 <center>
-    <img src="map_for_readme.png">
+    <img src="rm_files/map_for_readme.png">
 </center>
 
 <div style="width:100%; fontsize:14px; display:flex; align-items:center; flex-direction:column;">
@@ -193,19 +193,19 @@ cd.show_global_informations()
 
 
     
-![png](main_files/main_7_0.png)
+![png](rm_files/main_7_0.png)
     
 
 
 
     
-![png](main_files/main_7_1.png)
+![png](rm_files/main_7_1.png)
     
 
 
 
     
-![png](main_files/main_7_2.png)
+![png](rm_files/main_7_2.png)
     
 
 
@@ -214,19 +214,19 @@ cd.show_global_informations()
 
 
     
-![png](main_files/main_9_0.png)
+![png](rm_files/main_9_0.png)
     
 
 
 
     
-![png](main_files/main_9_1.png)
+![png](rm_files/main_9_1.png)
     
 
 
 
     
-![png](main_files/main_9_2.png)
+![png](rm_files/main_9_2.png)
     
 
 
