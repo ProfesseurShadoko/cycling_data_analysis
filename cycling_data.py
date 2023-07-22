@@ -286,6 +286,21 @@ class CyclingData:
             "mycmap", [(0, "green"), (0.03, "yellow"), (0.06, "orange"), (0.09, "red"), (0.12, "brown"), (0.15, "black"), (1,"black")]
         )
         
+        def get_rolling_averager(window):
+            """
+            Args:
+                window (float): returns a function to compute the avg slope over <window> meters
+            """
+            def get_avg_slope(row):
+                
+                return df[
+                    (df["position"]>row["position"]-window/2) & (df["position"]<row["position"]+window/2)
+                ]["slope"].mean()
+                
+            return get_avg_slope
+                
+        df['slope'] = df.apply(get_rolling_averager(500),axis=1)
+        
         df['color'] = df['slope'].apply(lambda x: colors.to_hex(cmap(abs(x))))
         
         for i in range(0, len(df)-1):
@@ -315,7 +330,7 @@ class CyclingData:
         legend_html = """
 <div style="width:100%; fontsize:14px; display:flex; align-items:center; flex-direction:column;">
     <div>
-    <b>Legende (pente)</b><br>
+    <b>Legende (pente moyenne sur 500m)</b><br>
     <div style="background: green; width: 10px; height: 10px; display: inline-block;"></div> 0%-3%<br>
     <div style="background: yellow; width: 10px; height: 10px; display: inline-block;"></div> 3%-6%<br>
     <div style="background: orange; width: 10px; height: 10px; display: inline-block;"></div> 6%-9%<br>
