@@ -1,0 +1,5 @@
+# Ignorer tous les fichiers .fit
+*.fit
+
+# Ne pas ignorer exemple.fit
+!exemple.fit
