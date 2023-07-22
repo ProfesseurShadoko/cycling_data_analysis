@@ -3,3 +3,11 @@
 
 # Ne pas ignorer exemple.fit
 !exemple.fit
+
+# Ignorer tous les fichiers .md
+*.md
+
+# Ne pas ignorer README.md
+!README.md
+
+/main_files/
