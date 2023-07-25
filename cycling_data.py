@@ -13,6 +13,8 @@ import folium
 
 import os
 import numpy as np
+import json
+import requests
 
 
 class CyclingData:
@@ -50,10 +52,11 @@ class CyclingData:
         
     """
     
-    def __init__(self,filename:str=None)->None:
+    def __init__(self,filename:str=None,reload_altitude:bool=False)->None:
         """
         Args:
             filename (str): name of the file to be read in activities folder (so complete path to the file is "fit_file/<filename>)
+            reload_altitude (bool): sometimes the elevation from the Garmin isn't very accurate, this can be used to replace the altitude data from Garmin by geographical data (from France). Defaults to False.
         """
         if filename==None:
             return
@@ -102,6 +105,16 @@ class CyclingData:
         
         self.data = self.data[["time","position","altitude","speed","heart_rate","lon","lat"]]
         
+        self.data["lon"] = self.data["lon"]/11930465 # type conversion from binary to degrees
+        self.data["lat"] = self.data["lat"]/11930465
+        
+        # recompute altitude
+        if reload_altitude:
+            try:
+                self._overwrite_altitude_with_ign()
+            except:
+                print("Error while retrieving altitude data")
+        
         # analyse absolute values
         self.data["time"] = pd.to_datetime(self.data["time"])
         self.data["drag"] = CyclingData.compute_drag(
@@ -113,8 +126,7 @@ class CyclingData:
         self.data["kinetic_energy"] = 0.5 * (self.mass+self.bike_mass) * self.data["speed"]**2
         self.data["potential_energy"] = (self.mass+self.bike_mass) * CyclingData.g * self.data["altitude"]
         
-        self.data["lon"] = self.data["lon"]/11930465 # type conversion from binary to degrees
-        self.data["lat"] = self.data["lat"]/11930465
+        
         
         # analyse relative values
         absolute_columns = ["time","position","altitude","speed","kinetic_energy","potential_energy"]
@@ -545,6 +557,41 @@ class CyclingData:
     # PHYSICS #
     ###########
     
+    def _overwrite_altitude_with_ign(self):
+        """
+        Data:
+            https://geoservices.ign.fr/documentation/services/api-et-services-ogc/calcul-altimetrique-rest (API)
+            
+        Action:
+            overwrites the altitude data with data from the IGN website, to avoid inprecise data from the Garmin GPS mesures
+        """
+        def get_altitude_profile(lons:pd.Series,lats:pd.Series):
+            url = "https://wxs.ign.fr/calcul/alti/rest/elevationLine.json"
+            params = {
+                'lon': "|".join(map(str, lons)),
+                'lat': "|".join(map(str, lats)),
+            }
+            response = requests.get(url, params=params)
+            data = json.loads(response.text)
+            return data['elevations']
+        
+        def get_altitude(lons:pd.Series,lats:pd.Series, window:int=190):
+            """
+            Args:
+                window (int, optional): cannot send thausands of points to the website. We have to cut it down. Defaults to 190.
+            """
+            altitudes = []
+            start_index=0
+            while start_index < len(lons):
+                stop_index = min(len(lons),start_index+window)
+                altitudes.extend(get_altitude_profile(lons[start_index:stop_index],lats[start_index:stop_index]))
+                start_index+=window
+            return [mesure["z"] for mesure in altitudes]
+
+        self.data["altitude"] = get_altitude(self.data["lon"],self.data["lat"])
+        self.data["altitude"] = self.data["altitude"].rolling(window=5,min_periods=1).median()
+        
+    
     @staticmethod
     def compute_drag(
         mass:float,
@@ -579,7 +626,13 @@ class CyclingData:
         CyclingData.mass = mass
         CyclingData.size = size
     
-    
+    @staticmethod
+    def _show_file_structure(filename:str):
+        file = FitFile("activites/"+filename)
+        for mesure in file.get_messages('record'):
+            for mesure_column in mesure:
+                print(f"Mesure : {mesure_column.name} -> {mesure_column.value}")
+            break
     
 
         
