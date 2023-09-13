@@ -150,7 +150,7 @@ class CyclingData:
         
         self.data["slope"] = self.data["altitude_delta"] / self.data["position_delta"]
         # 100*slope is the slope in %
-        self.data["slope"] = self.data["slope"].rolling(window=5,min_periods=1).median()
+        #self.data["slope"] = self.data["slope"].rolling(window=5,min_periods=1).median()
         # in order to remove anomalies, we add a rolling median to our date
         # TODO: added rolling to other variables, like heart rate or altitude earlier
         
@@ -163,8 +163,23 @@ class CyclingData:
     
     def get_data(self)->pd.DataFrame:
         """
-        Returns:
-            pd.DataFrame: copy
+        Dataframe containing the data of the activity, with the additional computations.
+        
+        Columns:
+            time: Timestamp (date and time)
+            activity_time : time since start (seconds)
+            position: Distance traveled (m)
+            altitude: Altitude (m)
+            speed: Speed (m/s)
+            heart_rate: Heart rate (bpm)
+            drag: Drag (N)
+            kinetic_energy: Kinetic energy (J)
+            potential_energy: Potential energy (J)
+            time_delta: time elapsed since last mesure (s)
+            position_delta: distance traveled since last mesure (m)
+            slope: slope*100 is slope in %
+            watts: (J)
+            
         """
         return self.data.copy()
 
@@ -276,9 +291,9 @@ class CyclingData:
         display(Markdown(f"""
 <center>
 
-| Durée de l'activité | Distance parcourue | Vitesse moyenne | Vitesse maximale | Dénivelé Positif | FC Moyenne | Energie totale produite | PPO | FTP | VO2MAX (mL/kg/min) |
+| Durée de l'activité | Distance parcourue | Vitesse moyenne | Vitesse maximale | Dénivelé Positif | FC Moyenne | Energie totale produite | PPO | FTP | VO2MAX |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| {str(datetime.timedelta(seconds=int(self.data["time_delta"].sum())))} | {self.data["position"].max()/1000:.2f} km | {self.data["position"].max()/self.data["time_delta"].sum()*3.6:.1f} km/h | {self.data["speed"].max()*3.6:.0f} km/h | {self.data[self.data["altitude_delta"]>0]["altitude_delta"].sum():.0f} m | {self.data["heart_rate"].mean():.0f} bpm | {(self.data["watts"]*self.data["time_delta"]).sum()/1000:.0f} kJ | {self.estimate_ppo():.0f} W | {self.estimate_ftp():.0f} W | {self.estimate_vo2max():.0f} |
+| {str(datetime.timedelta(seconds=int(self.data["time_delta"].sum())))} | {self.data["position"].max()/1000:.2f} km | {self.data["position"].max()/self.data["time_delta"].sum()*3.6:.1f} km/h | {self.data["speed"].max()*3.6:.0f} km/h | {self.data[self.data["altitude_delta"]>0]["altitude_delta"].sum():.0f} m | {self.data["heart_rate"].mean():.0f} bpm | {(self.data["watts"]*self.data["time_delta"]).sum()/1000:.0f} kJ | {self.estimate_ppo():.0f} W | {self.estimate_ftp()/self.mass:.1f} W/kg | {self.estimate_vo2max():.0f} mL/kg/min |
 
 </center>
             
@@ -311,7 +326,7 @@ class CyclingData:
                 
             return get_avg_slope
                 
-        df['slope'] = df.apply(get_rolling_averager(500),axis=1)
+        df['slope'] = df.apply(get_rolling_averager(100),axis=1)
         
         df['color'] = df['slope'].apply(lambda x: colors.to_hex(cmap(abs(x))))
         
@@ -342,7 +357,7 @@ class CyclingData:
         legend_html = """
 <div style="width:100%; fontsize:14px; display:flex; align-items:center; flex-direction:column;">
     <div>
-    <b>Legende (pente moyenne sur 500m)</b><br>
+    <b>Legende (pente moyenne sur 100m)</b><br>
     <div style="background: green; width: 10px; height: 10px; display: inline-block;"></div> 0%-3%<br>
     <div style="background: yellow; width: 10px; height: 10px; display: inline-block;"></div> 3%-6%<br>
     <div style="background: orange; width: 10px; height: 10px; display: inline-block;"></div> 6%-9%<br>
@@ -590,7 +605,7 @@ class CyclingData:
 
         self.data["altitude"] = get_altitude(self.data["lon"],self.data["lat"])
         self.data["altitude"] = self.data["altitude"].rolling(window=5,min_periods=1).median()
-        
+        print("Altitude data overwritten with IGN data")
     
     @staticmethod
     def compute_drag(
