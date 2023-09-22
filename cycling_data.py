@@ -15,6 +15,7 @@ import os
 import numpy as np
 import json
 import requests
+from scipy.stats import gaussian_kde
 
 
 class CyclingData:
@@ -236,7 +237,7 @@ class CyclingData:
                     
         return X.copy()
     
-    def set_y_axis(self,ax:plt.Axes,axis_type:Literal["time_delta","altitude","speed","heart_rate","watts","slope"])->pd.Series:
+    def set_y_axis(self,ax:plt.Axes,axis_type:Literal["time_delta","altitude","speed","heart_rate","watts","slope","density"])->pd.Series:
         """
         Returns:
             pd.Series: Y to use aftewards with ax.plot(.,Y,...) or ax.bar(.,Y,...)
@@ -263,7 +264,8 @@ class CyclingData:
             "speed":"Vitesse (km/h)",
             "heart_rate":"Fréquence Cardiaque (bpm)",
             "watts":"Puissance (W)",
-            "slope":"Pente (%)"
+            "slope":"Pente (%)",
+            "density":"Densité",
         }
         
         ax.set_ylabel(labels[axis_type])
@@ -649,6 +651,52 @@ class CyclingData:
                 print(f"Mesure : {mesure_column.name} -> {mesure_column.value}")
             break
     
+    ######################
+    # DATA VISUALIZATION #
+    ######################
+    
+    def show_heart_beat_distribution(self):
+        
+        if self.get_data()["heart_rate"].max()<1:
+            print("No heart rate data available")
+            return
+        
+        X = np.arange(45,235,10)
+        fig, ax = plt.subplots(1,1)
+        fig.set_size_inches(20,4)
+        ax.set_title("Distribution de la fc au cours de l'activité")
+        ax.set_ylabel("Densité")
+        ax.set_xlabel("Fréquence cardiaque (bpm)")
+        ax.set_xticks(np.arange(X.min()-5,X.max()+5,10))
+        
+        kde = gaussian_kde(self.data["heart_rate"])
+        kde_X = np.linspace(X.min(),X.max(),1000)
+        ax.fill_between(kde_X,kde(kde_X),color="lightgreen",alpha=0.8)
+        plt.show()
+    
+    def show_power_distribution(self):
+        fig,ax = plt.subplots(1,1)
+        fig.set_size_inches(20,4)
+        max_pow = self.data["watts"].mean()+3*self.data["watts"].std()
+        
+        X = np.arange(0,max_pow,50)
+        kde = gaussian_kde(self.data["watts"])
+        kde_X = np.linspace(X.min(),X.max(),1000)
+        ax.fill_between(kde_X,kde(kde_X),color="yellow",alpha=0.8)
+        ax.axvline(x=self.estimate_ppo(),color="grey",linestyle="--",label=f"Peak Power Output (PPO) : {self.estimate_ppo():.0f} W")
+        ax.axvline(x=self.estimate_ftp(),color="darkgrey",linestyle="--",label=f"Fonctional Treshold Power (FTP) : {self.estimate_ftp():.0f} W")
+        
+        ax.set_xlabel("Puissance (W)")
+        ax.set_ylabel("Densité")
+        ax.set_title("Distribution de la puissance au cours de l'activité")
+        ax.legend()
+        plt.show()
+        
+
+if __name__=="__main__":
+    cd = CyclingData("V-01-01-01-01_X-Remy-X.fit")
+    cd.show_heart_beat_distribution()
+    cd.show_power_distribution()
 
         
         
