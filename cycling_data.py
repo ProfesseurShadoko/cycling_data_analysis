@@ -293,11 +293,20 @@ class CyclingData:
         display(Markdown(f"""
 <center>
 
-| Durée de l'activité | Distance parcourue | Vitesse moyenne | Vitesse maximale | Dénivelé Positif | FC Moyenne | Energie totale produite | PPO | FTP | VO2MAX |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| {str(datetime.timedelta(seconds=int(self.data["time_delta"].sum())))} | {self.data["position"].max()/1000:.2f} km | {self.data["position"].max()/self.data["time_delta"].sum()*3.6:.1f} km/h | {self.data["speed"].max()*3.6:.0f} km/h | {self.data[self.data["altitude_delta"]>0]["altitude_delta"].sum():.0f} m | {self.data["heart_rate"].mean():.0f} bpm | {(self.data["watts"]*self.data["time_delta"]).sum()/1000:.0f} kJ | {self.estimate_ppo():.0f} W | {self.estimate_ftp()/self.mass:.1f} W/kg | {self.estimate_vo2max():.0f} mL/kg/min |
+| Durée de l'activité | Distance parcourue | Vitesse moyenne | Vitesse maximale | Dénivelé Positif | FC Moyenne |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| {str(datetime.timedelta(seconds=int(self.data["time_delta"].sum())))} | {self.data["position"].max()/1000:.2f} km | {self.data["position"].max()/self.data["time_delta"].sum()*3.6:.1f} km/h | {self.data["speed"].max()*3.6:.0f} km/h | {self.data[self.data["altitude_delta"]>0]["altitude_delta"].sum():.0f} m | {self.data["heart_rate"].mean():.0f} bpm |
 
 </center>
+<br>
+<center>
+
+| Energie totale produite | PPO | FTP | VO2MAX | NP | TSS |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| {(self.data["watts"]*self.data["time_delta"]).sum()/1000:.0f} kJ | {self.estimate_ppo():.0f} W | {self.estimate_ftp()/self.mass:.1f} W/kg | {self.estimate_vo2max():.0f} mL/kg/min | {self.get_normalized_power():.0f} W | {self.get_training_stress_score():.0f} |
+
+</center>
+
             
         """))
     
@@ -312,7 +321,7 @@ class CyclingData:
         
         # add lines of the stage depending on slope
         cmap = LinearSegmentedColormap.from_list(
-            "mycmap", [(0, "green"), (0.03, "yellow"), (0.06, "orange"), (0.09, "red"), (0.12, "brown"), (0.15, "black"), (1,"black")]
+            "mycmap", [(0, "green"), (0.04, "yellow"), (0.08, "orange"), (0.12, "red"), (0.16, "brown"), (0.20, "black"), (1,"black")]
         )
         
         def get_rolling_averager(window):
@@ -360,12 +369,12 @@ class CyclingData:
 <div style="width:100%; fontsize:14px; display:flex; align-items:center; flex-direction:column;">
     <div>
     <b>Legende (pente moyenne sur 100m)</b><br>
-    <div style="background: green; width: 10px; height: 10px; display: inline-block;"></div> 0%-3%<br>
-    <div style="background: yellow; width: 10px; height: 10px; display: inline-block;"></div> 3%-6%<br>
-    <div style="background: orange; width: 10px; height: 10px; display: inline-block;"></div> 6%-9%<br>
-    <div style="background: red; width: 10px; height: 10px; display: inline-block;"></div> 9%-12%<br>
-    <div style="background: brown; width: 10px; height: 10px; display: inline-block;"></div> 12%-15%<br>
-    <div style="background: black; width: 10px; height: 10px; display: inline-block;"></div> >15%
+    <div style="background: green; width: 10px; height: 10px; display: inline-block;"></div> 0%-4%<br>
+    <div style="background: yellow; width: 10px; height: 10px; display: inline-block;"></div> 4%-8%<br>
+    <div style="background: orange; width: 10px; height: 10px; display: inline-block;"></div> 8%-12%<br>
+    <div style="background: red; width: 10px; height: 10px; display: inline-block;"></div> 12%-16%<br>
+    <div style="background: brown; width: 10px; height: 10px; display: inline-block;"></div> 16%-20%<br>
+    <div style="background: black; width: 10px; height: 10px; display: inline-block;"></div> >20%
     </div>
 </div>
 """
@@ -474,8 +483,13 @@ class CyclingData:
         ftp = self.estimate_ftp()
         ax.axhline(y=ppo,color="lightgrey",linestyle="--",label=f"Peak Power Input (PPO) : {ppo:.0f} W")
         ax.axhline(y=ftp,color="darkgrey",linestyle="--",label=f"Fonctional Treshold Power (FTP) : {ftp:.0f} W")
-        ax.plot(X,Y1,color="yellow",label="Puissance moyenne sur 1min")
+        ax.plot(X,Y1,color="red",label="Puissance moyenne sur 1min")
         ax.plot(X,Y2,color="orange",label="Puissance moyenne sur 20min")
+        
+        normalized = Y1**4
+        normalized = normalized/normalized.max()*Y1.max()
+        ax.fill_between(X,normalized,color="yellow",label="Puissance normalisée")
+        
         ax.set_ylim(0,Y1.max()*1.1)
         ax.legend()
         plt.show()
@@ -568,6 +582,28 @@ class CyclingData:
             VO_{2 max}: (mL/kg/min)
         """
         return (0.01141*self.estimate_ppo() + 0.435) * 1_000 / self.mass
+    
+    def get_normalized_power(self)->float:
+        """
+        Returns:
+            pd.Series: (self.data["watts"]**4).mean()**(1/4)
+        """
+        return (self.data["watts"]**4).mean()**(1/4)
+    
+    def get_intensity_factor(self)->float:
+        """
+        Returns:
+            float: self.get_normalized_power() / self.estimate_ftp()
+        """
+        return self.get_normalized_power() / self.estimate_ftp()
+    
+    def get_training_stress_score(self)->float:
+        """
+        Returns:
+            float: self.data["activity_time"].max() * self.get_normalized_power() * self.get_intensity_factor() / (self.estimate_ftp() * 3600) * 100
+        """
+        return self.data["activity_time"].max() * self.get_normalized_power() * self.get_intensity_factor() / (self.estimate_ftp() * 3600) * 100
+        
         
         
     ###########
